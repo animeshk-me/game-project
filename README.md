@@ -11,4 +11,4 @@ To execute the `main_experiment.c`
     > `./exp`
 
     
-Anime Anime
+Anime wants everything formal
