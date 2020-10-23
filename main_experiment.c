@@ -10,21 +10,24 @@
 #include<errno.h> 
 #include<ncurses.h>
 
-#define T 0.99
+#define T 100000
 
 
 // Coordinates of the CAR
-struct car {
-  int row_c;  // row #
-  int col_c;  // column #
-  int is_changed; // T/F
-};
+int row_car = 0;
+int col_car = 0;
+int is_car_changed = 0;
+// struct car {
+//   int row_c;  // row #
+//   int col_c;  // column #
+//   int is_changed; // T/F
+// };
 
 // A block to pass the arguments around the threads
 struct block {
   WINDOW * win;   // window pointer
-  char msg[64];   // useless for now
-  struct car C;   // the car associated with the window
+  // char msg[64];   // useless for now
+  // struct car C;   // the car associated with the window
 };
 
 int flag = 0;     // useless for now
@@ -35,23 +38,26 @@ void* runner1(void *params);
 void* runner2(void *params);
 // void* runner3(void *params);
 void* runner4(void *params);
+void PrintCar(WINDOW * win);
+void MakeBlank(WINDOW * win);
 
 int main() {
   initscr();
   noecho();
   cbreak();
+  col_car = 30;
+  row_car = 16;
   char msg[64];
-  WINDOW * inputwin = newwin(26, 104, 1, 0);
+  WINDOW * inputwin = newwin(26, 64, 1, 0);
   box(inputwin, 0, 0);
   // struct car C;
   // C.row_c = 20;
   // C.col_c = 36;
   struct block args1, args2, args3, args4;
   args1.win = inputwin;
-  args1.C.col_c = 50;
-  args1.C.row_c = 16;
-  args1.C.is_changed = 1;
-  args4.C = args1.C;
+  is_car_changed = 1;
+  // args1.C.is_changed = 1;
+  // args4.C = args1.C;
   args2.win = inputwin;
   args3.win = inputwin;
   args4.win = inputwin;
@@ -61,11 +67,11 @@ int main() {
   pthread_attr_init(&attr);
   refresh();
   wrefresh(inputwin);
-
+  MakeBlank(inputwin);
   pthread_create(&tid1, &attr, runner1, &args1);
   pthread_create(&tid2, &attr, runner2, &args2);
   // pthread_create(&tid3, &attr, runner3, &args3);
-  // pthread_create(&tid4, &attr, runner4, &args4);
+  pthread_create(&tid4, &attr, runner4, &args4);
   pthread_join(tid1, NULL);
   pthread_join(tid2, NULL);
   // pthread_join(tid3, NULL);
@@ -79,25 +85,36 @@ int main() {
 // prints the car 
 void* runner1(void *params) {
   struct block * args = params;
-  // move(args->C.row_c, args->C.col_c);
+  // move(row_car, args->C.col_c);
   while(1) {
-    if(args->C.is_changed == 1) {
-      // wrefresh(args->win);
-      mvwprintw(args->win, args->C.row_c, args->C.col_c, "****");
-      mvwprintw(args->win, args->C.row_c + 1, args->C.col_c, "****");
-      mvwprintw(args->win, args->C.row_c + 2, args->C.col_c, "****");
-      mvwprintw(args->win, args->C.row_c + 3, args->C.col_c, "****");
-      mvwprintw(args->win, args->C.row_c + 4, args->C.col_c - 4, "************");
-      mvwprintw(args->win, args->C.row_c + 5, args->C.col_c - 4, "************");
-      mvwprintw(args->win, args->C.row_c + 6, args->C.col_c - 4, "************");
-      mvwprintw(args->win, args->C.row_c + 7, args->C.col_c - 4, "****    ****");
-      mvwprintw(args->win, args->C.row_c + 8, args->C.col_c - 4, "****    ****");
-      mvwprintw(args->win, args->C.row_c + 9, args->C.col_c - 4, "****    ****");
-      args->C.is_changed = 0;
+    if(is_car_changed == 1) {
+      MakeBlank(args->win);
+      PrintCar(args->win);
+      is_car_changed = 0;
     }
   }
-  // wprintw(args->win, " ***** ");
   pthread_exit(NULL);
+}
+
+void MakeBlank(WINDOW * win) {
+  for (int j = 0; j <= 26; j++) {
+    for (int i = 3; i <= 60; i++) {
+      mvwprintw(win, j, i, " ");
+    }
+  }
+}
+
+void PrintCar(WINDOW * win) {
+  mvwprintw(win, row_car, col_car, "******");
+  mvwprintw(win, row_car + 1, col_car, "******");
+  mvwprintw(win, row_car + 2, col_car, "******");
+  mvwprintw(win, row_car + 3, col_car, "******");
+  mvwprintw(win, row_car + 4, col_car - 5, "****************");
+  mvwprintw(win, row_car + 5, col_car - 5, "****************");
+  mvwprintw(win, row_car + 6, col_car - 5, "****************");
+  mvwprintw(win, row_car + 7, col_car - 5, "*****      *****");
+  mvwprintw(win, row_car + 8, col_car - 5, "*****      *****");
+  mvwprintw(win, row_car + 9, col_car - 5, "*****      *****");
 }
 
 // runs both the fences
@@ -105,11 +122,11 @@ void* runner2(void *params) {
   struct block * args = params;
   while(1) {
     blink2(0, args->win, 1, 0);
-    blink2(0, args->win, 1, 99);
-    sleep(T);
+    blink2(0, args->win, 1, 61);
+    usleep(T);
     blink2(1, args->win, 1, 0);
-    blink2(1, args->win, 1, 99);
-    sleep(T);  
+    blink2(1, args->win, 1, 61);
+    usleep(T);  
   }
   printf ("Welcome to my game \n");
   pthread_exit(NULL);
@@ -124,26 +141,30 @@ void* runner3 (void *params) {
 void *runner4 (void *params) {
   struct block * args = params;
   while(1) {
-    // sleep(4);
+    // usleep(4);
     // args->C.col_c + 30;
     // wrefresh(args->win);
     int c = wgetch(args->win);
     if (c == 'a') {
       // printf("yes");
-      wprintw(args->win, "hi");
+      // wprintw(args->win, "hi");
       // memset(args->msg,0,strlen(args->msg));
       // strcpy(args->msg, "hi a!");
       // mvwprintw(args->win, 0, 0, args->msg);
-      args->C.col_c -= 20;
-      args->C.is_changed = 1;
+      if (col_car > 10) {
+        col_car -= 20;
+        is_car_changed = 1;
+      }
       // wrefresh(args->win);
     } 
     else if (c == 'd') {
       // memset(args->msg,0,strlen(args->msg));
       // strcpy(args->msg, "hi a!");
       // mvwprintw(args->win, 0, 0, args->msg);
-      args->C.col_c += 20;
-      args->C.is_changed = 1;
+      if (col_car < 40) {
+        col_car += 20;
+        is_car_changed = 1;
+      }
       // wrefresh(args->win);
     } 
   }
