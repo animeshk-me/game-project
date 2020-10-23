@@ -17,17 +17,16 @@
 int row_car = 0;
 int col_car = 0;
 int is_car_changed = 0;
-// struct car {
-//   int row_c;  // row #
-//   int col_c;  // column #
-//   int is_changed; // T/F
-// };
+
+int row_obs;
+int col_obs;
+int is_obs_changed;
+
 
 // A block to pass the arguments around the threads
 struct block {
   WINDOW * win;   // window pointer
-  // char msg[64];   // useless for now
-  // struct car C;   // the car associated with the window
+  int obs_num;    // obstacle number (0/1/2)
 };
 
 int flag = 0;     // useless for now
@@ -36,10 +35,15 @@ int flag = 0;     // useless for now
 void blink2(int n, WINDOW* win, int cur_r, int cur_c);
 void* runner1(void *params);
 void* runner2(void *params);
-// void* runner3(void *params);
+void* runner3(void *params);
 void* runner4(void *params);
+void* runner5(void *params);
+void* runner6(void* params);
+
 void PrintCar(WINDOW * win);
 void MakeBlank(WINDOW * win);
+void PrintObstacle(WINDOW * win, int row_c, int col_c);
+// void BlankPrev(WINDOW * win);
 
 int main() {
   initscr();
@@ -53,16 +57,19 @@ int main() {
   // struct car C;
   // C.row_c = 20;
   // C.col_c = 36;
-  struct block args1, args2, args3, args4;
+  struct block args1, args2, args3, args4, args5, args6;
   args1.win = inputwin;
   is_car_changed = 1;
+  is_obs_changed = 0;
   // args1.C.is_changed = 1;
   // args4.C = args1.C;
   args2.win = inputwin;
   args3.win = inputwin;
   args4.win = inputwin;
+  args5.win = inputwin;
+  args6.win = inputwin;
   // args2 = args1;
-  pthread_t tid1, tid2, tid3, tid4;
+  pthread_t tid1, tid2, tid3, tid4, tid5, tid6;
   pthread_attr_t attr;
   pthread_attr_init(&attr);
   refresh();
@@ -70,18 +77,23 @@ int main() {
   MakeBlank(inputwin);
   pthread_create(&tid1, &attr, runner1, &args1);
   pthread_create(&tid2, &attr, runner2, &args2);
-  // pthread_create(&tid3, &attr, runner3, &args3);
+  pthread_create(&tid3, &attr, runner3, &args3);
   pthread_create(&tid4, &attr, runner4, &args4);
+  pthread_create(&tid5, &attr, runner5, &args5);
+  // pthread_create(&tid6, &attr, runner6, &args6);
   pthread_join(tid1, NULL);
   pthread_join(tid2, NULL);
-  // pthread_join(tid3, NULL);
+  pthread_join(tid3, NULL);
   pthread_join(tid4, NULL);
+  pthread_join(tid5, NULL);
+  // pthread_join(tid6, NULL);
   
   getch();
   endwin();
   return 0;
 }
 
+/*********** Printing the Car logic ********************/
 // prints the car 
 void* runner1(void *params) {
   struct block * args = params;
@@ -99,7 +111,11 @@ void* runner1(void *params) {
 void MakeBlank(WINDOW * win) {
   for (int j = 0; j <= 26; j++) {
     for (int i = 3; i <= 60; i++) {
-      mvwprintw(win, j, i, " ");
+      // for (int k = 0; k < 3; k++) {
+        if(!((j >= row_obs) && (j <= row_obs+3) && (i >= col_obs) && (i <= col_obs+6)))
+        
+          mvwprintw(win, j, i, " ");
+      // }
     }
   }
 }
@@ -117,6 +133,10 @@ void PrintCar(WINDOW * win) {
   mvwprintw(win, row_car + 9, col_car - 5, "*****      *****");
 }
 
+/*********************************************************/
+
+/******************* Fence movement logic ****************/
+
 // runs both the fences
 void* runner2(void *params) {
   struct block * args = params;
@@ -132,11 +152,120 @@ void* runner2(void *params) {
   pthread_exit(NULL);
 }
 
-// Doesn't do anything yet
-void* runner3 (void *params) {
-
+// blinks the fences
+void blink2(int n, WINDOW* win, int cur_r, int cur_c) {
+  wrefresh(win);
+  int main = cur_r;
+  int i = 24;
+  while(i--) {
+    mvwprintw(win, cur_r, cur_c, "||| ");
+    cur_r++;
+  }
+  cur_r = main;
+  if (n == 1) {
+    mvwprintw(win, cur_r, cur_c, ",,,");
+    cur_r++;
+  }
+  i = 23;
+  while(i--) {
+    mvwprintw(win, cur_r, cur_c, ",,,");
+    cur_r += 3;
+  }
+  
+  return;
 }
 
+/*********************************************************/
+
+/******************** Obstacle logic *********************/
+
+// moves the obstacle 
+void* runner3(void *params) {
+  struct block * args = params;
+
+  while(1) {  
+    // int i = 0;
+    // for (int i = 0; i < 3; i++) {
+      if(is_obs_changed == 1) {
+        mvwprintw(args->win, row_obs - 1, col_obs, "      ");
+        // BlankPrev(args->win);
+        PrintObstacle(args->win, row_obs, col_obs);
+        usleep(100000);
+        row_obs = row_obs + 1;
+        // is_obs_changed = 0;
+      }
+    // }
+  }
+  pthread_exit(NULL);
+}
+
+// generates the new obstacles periodically
+void* runner5(void* params) {
+  struct block * args = params;
+  int i = 0;
+  // wprintw(args->win, "shul");
+  while(1) {
+  //   srand(time(0));
+  //   int t = rand() % 2;
+    row_obs = 1;
+    int car_location = col_car;
+    col_obs = car_location;
+    is_obs_changed = 1;
+  //   // i = (i + 1) % 3;
+  //   if(car_location == 10) {
+  //     switch(t) {
+  //       case 0:
+  //         col_obs = 30;
+  //         break;
+  //       case 1:
+  //         col_obs = 50;
+  //         break;
+  //     }
+  //   }
+  //   else if(car_location == 30) {
+  //     switch(t) {
+  //       case 0:
+  //         col_obs = 50;
+  //         break;
+  //       case 1:
+  //         col_obs = 10;
+  //         break;
+  //     }
+  //   }
+  //   else if(car_location == 50) {
+  //     switch(t) {
+  //       case 0:
+  //         col_obs = 10;
+  //         break;
+  //       case 1:
+  //         col_obs = 30;
+  //         break;
+  //     }
+  //   }
+  //   // col_obs = 10;
+  //   is_obs_changed = 1;
+  //   // i = (i + 1) % 3;
+  //   // col_obs[i] = car_location;
+  //   // is_obs_changed[i] = 1;
+  //   // i = (i + 1) % 3;
+  //   // sleep(0.9);
+    while(row_obs != 26) {}
+  }
+  pthread_exit(NULL);
+}
+
+
+// print the obstacle
+void PrintObstacle(WINDOW * win, int row_c, int col_c) {
+  mvwprintw(win, row_c, col_c, "XXXXXX");
+  mvwprintw(win, row_c + 1, col_c, "XXXXXX");
+  mvwprintw(win, row_c + 2, col_c, "XXXXXX");
+  mvwprintw(win, row_c + 3, col_c, "XXXXXX");
+}
+
+/*********************************************************/
+
+/*********************** Moving the Car logic *****************/
 // listen to keyboard
 void *runner4 (void *params) {
   struct block * args = params;
@@ -171,84 +300,6 @@ void *runner4 (void *params) {
   pthread_exit(NULL);
 }
 
+/**************************************************************/
 
-// void* runner1(void *params) {
-//   struct block * args = params;
-//   while(1) {
-//     int c = wgetch(args->win);
-//     if (c == 'a') {
-//       memset(args->msg,0,strlen(args->msg));
-//       strcpy(args->msg, "hi a!");
-//       mvwprintw(args->win, 0, 0, args->msg);
-//       wrefresh(args->win);
-//     } 
-//     else if (c == 'd') {
-//       memset(args->msg,0,strlen(args->msg));
-//       strcpy(args->msg, "hi d!");
-//       mvwprintw(args->win, 0, 0, args->msg);
-//       wrefresh(args->win);
-//     } 
-//     else if (c == 'w') {
-//       memset(args->msg,0,strlen(args->msg));
-//       // strcpy(msg, "hi w!");
-//       mvwprintw(args->win, 0, 0, args->msg);
-//       printf("hello world\n\r");
-//       wrefresh(args->win);
-//     } 
-//     else if (c == 's') {
-//       memset(args->msg,0,strlen(args->msg));
-//       strcpy(args->msg, "hi s!");
-//       wrefresh(args->win);
-//     } 
-//     else if (c == 'q') {
-//       break;
-//     }
-//     else {
-//       memset(args->msg,0,strlen(args->msg));
-//       strcpy(args->msg, "Invalid input!");
-//       mvwprintw(args->win, 0, 0, args->msg);
-//       wrefresh(args->win);
-//     } 
-//   }
-//   pthread_exit(NULL); 
-
-// }
-
-
-void blink2(int n, WINDOW* win, int cur_r, int cur_c) {
-  wrefresh(win);
-  // char str[] = "|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r";
-  int main = cur_r;
-  int i = 24;
-  while(i--) {
-    mvwprintw(win, cur_r, cur_c, "||| ");
-    cur_r++;
-  }
-  cur_r = main;
-  if (n == 1) {
-    mvwprintw(win, cur_r, cur_c, ",,,");
-    cur_r++;
-  }
-  i = 23;
-  while(i--) {
-    mvwprintw(win, cur_r, cur_c, ",,,");
-    cur_r += 3;
-  }
-  
-  return;
-}
-
-// void blink(int n, WINDOW* win, int cur_r, int cur_c) {
-//   wrefresh(win);
-//   char str[] = "|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r\n\r|||\n\r|||\n\r";
-//   // int cur_r = 1;
-//   // int cur_c = 0;
-//   if (n == 1) {
-//     mvwprintw(win, cur_r, cur_c, "\n\r");
-//     cur_r++;
-//     // printf("hello\n");
-//   }
-//   mvwprintw(win, cur_r, cur_c, str);
-//   return;
-// }
 
