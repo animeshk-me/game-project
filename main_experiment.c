@@ -18,9 +18,9 @@ int row_car = 0;
 int col_car = 0;
 int is_car_changed = 0;
 
-int row_obs;
-int col_obs;
-int is_obs_changed;
+int row_obs[3];
+int col_obs[3];
+int is_obs_changed[3];
 
 
 // A block to pass the arguments around the threads
@@ -29,7 +29,6 @@ struct block {
   int obs_num;    // obstacle number (0/1/2)
 };
 
-int flag = 0;     // useless for now
 
 // void blink(int n, WINDOW* win, int cur_r, int cur_c);
 void blink2(int n, WINDOW* win, int cur_r, int cur_c);
@@ -60,7 +59,10 @@ int main() {
   struct block args1, args2, args3, args4, args5, args6;
   args1.win = inputwin;
   is_car_changed = 1;
-  is_obs_changed = 0;
+  for (int i = 0; i < 3; i++) { 
+    row_obs[i] = 1;
+    is_obs_changed[i] = 0;
+  }
   // args1.C.is_changed = 1;
   // args4.C = args1.C;
   args2.win = inputwin;
@@ -111,11 +113,10 @@ void* runner1(void *params) {
 void MakeBlank(WINDOW * win) {
   for (int j = 0; j <= 26; j++) {
     for (int i = 3; i <= 60; i++) {
-      // for (int k = 0; k < 3; k++) {
-        if(!((j >= row_obs) && (j <= row_obs+3) && (i >= col_obs) && (i <= col_obs+6)))
-        
+      for (int k = 0; k < 3; k++) {
+        if(!((j >= row_obs[k]) && (j <= row_obs[k]+3) && (i >= col_obs[k]) && (i <= col_obs[k]+6)))
           mvwprintw(win, j, i, " ");
-      // }
+      }
     }
   }
 }
@@ -185,16 +186,16 @@ void* runner3(void *params) {
 
   while(1) {  
     // int i = 0;
-    // for (int i = 0; i < 3; i++) {
-      if(is_obs_changed == 1) {
-        mvwprintw(args->win, row_obs - 1, col_obs, "      ");
+    for (int i = 0; i < 3; i++) {
+      if(is_obs_changed[i] == 1) {
+        mvwprintw(args->win, row_obs[i] - 1, col_obs[i], "      ");
         // BlankPrev(args->win);
-        PrintObstacle(args->win, row_obs, col_obs);
+        PrintObstacle(args->win, row_obs[i], col_obs[i]);
         usleep(100000);
-        row_obs = row_obs + 1;
+        row_obs[i] = row_obs[i] + 1;
         // is_obs_changed = 0;
       }
-    // }
+    }
   }
   pthread_exit(NULL);
 }
@@ -205,51 +206,58 @@ void* runner5(void* params) {
   int i = 0;
   // wprintw(args->win, "shul");
   while(1) {
-  //   srand(time(0));
-  //   int t = rand() % 2;
-    row_obs = 1;
-    int car_location = col_car;
-    col_obs = car_location;
-    is_obs_changed = 1;
-  //   // i = (i + 1) % 3;
-  //   if(car_location == 10) {
-  //     switch(t) {
-  //       case 0:
-  //         col_obs = 30;
-  //         break;
-  //       case 1:
-  //         col_obs = 50;
-  //         break;
-  //     }
-  //   }
-  //   else if(car_location == 30) {
-  //     switch(t) {
-  //       case 0:
-  //         col_obs = 50;
-  //         break;
-  //       case 1:
-  //         col_obs = 10;
-  //         break;
-  //     }
-  //   }
-  //   else if(car_location == 50) {
-  //     switch(t) {
-  //       case 0:
-  //         col_obs = 10;
-  //         break;
-  //       case 1:
-  //         col_obs = 30;
-  //         break;
-  //     }
-  //   }
-  //   // col_obs = 10;
-  //   is_obs_changed = 1;
-  //   // i = (i + 1) % 3;
-  //   // col_obs[i] = car_location;
-  //   // is_obs_changed[i] = 1;
-  //   // i = (i + 1) % 3;
-  //   // sleep(0.9);
-    while(row_obs != 26) {}
+    srand(time(0));
+    int t = rand() % 2;
+    if ((row_obs[i] >= 26) || (row_obs[i] == 1)){
+      row_obs[i] = 1;
+      col_obs[i] = col_car;
+      is_obs_changed[i] = 1;
+      usleep(1901000);
+      continue;
+    }
+    i = (i + 1) % 3;
+    if ((row_obs[i] >= 26) || (row_obs[i] == 1)){
+      row_obs[i] = 1;
+      if(col_car == 10) {
+        switch(t) {
+          case 0:
+            col_obs[i] = 30;
+            break;
+          case 1:
+            col_obs[i] = 50;
+            break;
+        }
+      }
+      else if(col_car == 30) {
+        switch(t) {
+          case 0:
+            col_obs[i] = 50;
+            break;
+          case 1:
+            col_obs[i] = 10;
+            break;
+        }
+      }
+      else if(col_car == 50) {
+        switch(t) {
+          case 0:
+            col_obs[i] = 10;
+            break;
+          case 1:
+            col_obs[i] = 30;
+            break;
+        }
+      }
+      // col_obs = 10;
+      is_obs_changed[i] = 1;
+      usleep(1901000);
+      i = (i + 1) % 3;
+      // col_obs[i] = car_location;
+      // is_obs_changed[i] = 1;
+      // i = (i + 1) % 3;
+      // sleep(0.9);
+      // while(row_obs[i] != 26) {}
+    }
   }
   pthread_exit(NULL);
 }
@@ -270,31 +278,18 @@ void PrintObstacle(WINDOW * win, int row_c, int col_c) {
 void *runner4 (void *params) {
   struct block * args = params;
   while(1) {
-    // usleep(4);
-    // args->C.col_c + 30;
-    // wrefresh(args->win);
     int c = wgetch(args->win);
     if (c == 'a') {
-      // printf("yes");
-      // wprintw(args->win, "hi");
-      // memset(args->msg,0,strlen(args->msg));
-      // strcpy(args->msg, "hi a!");
-      // mvwprintw(args->win, 0, 0, args->msg);
       if (col_car > 10) {
         col_car -= 20;
         is_car_changed = 1;
       }
-      // wrefresh(args->win);
     } 
     else if (c == 'd') {
-      // memset(args->msg,0,strlen(args->msg));
-      // strcpy(args->msg, "hi a!");
-      // mvwprintw(args->win, 0, 0, args->msg);
       if (col_car < 40) {
         col_car += 20;
         is_car_changed = 1;
       }
-      // wrefresh(args->win);
     } 
   }
   pthread_exit(NULL);
