@@ -9,97 +9,186 @@
 #include<fcntl.h>
 #include<errno.h> 
 #include<ncurses.h>
+#include<signal.h>
 
 #define T 100000
-
+#define SIZE 2
 
 // Coordinates of the CAR
 int row_car = 0;
 int col_car = 0;
 int is_car_changed = 0;
+int game_over = 0;
 
-int row_obs[3];
-int col_obs[3];
-int is_obs_changed[3];
+
+
+int row_obs[SIZE];
+int col_obs[SIZE];
+int is_obs_changed[SIZE];
 
 
 // A block to pass the arguments around the threads
 struct block {
   WINDOW * win;   // window pointer
   int obs_num;    // obstacle number (0/1/2)
+  int i_ptr;
+  int j_ptr;
 };
 
-
-// void blink(int n, WINDOW* win, int cur_r, int cur_c);
-void blink2(int n, WINDOW* win, int cur_r, int cur_c);
+void blink_fence(int n, WINDOW* win, int cur_r, int cur_c);
 void* runner1(void *params);
 void* runner2(void *params);
 void* runner3(void *params);
 void* runner4(void *params);
 void* runner5(void *params);
 void* runner6(void* params);
-
+void HandleHighscore(long long score, WINDOW * inputwin);
 void PrintCar(WINDOW * win);
 void MakeBlank(WINDOW * win);
 void PrintObstacle(WINDOW * win, int row_c, int col_c);
-// void BlankPrev(WINDOW * win);
+void get_string(char * dest, long long src, int *dest_len);
 
 int main() {
   initscr();
   noecho();
   cbreak();
   col_car = 30;
-  row_car = 16;
+  row_car = 20;
   char msg[64];
-  WINDOW * inputwin = newwin(26, 64, 1, 0);
+  clock_t start, end;
+  WINDOW * inputwin = newwin(26, 90, 1, 0);
   box(inputwin, 0, 0);
-  // struct car C;
-  // C.row_c = 20;
-  // C.col_c = 36;
+
   struct block args1, args2, args3, args4, args5, args6;
   args1.win = inputwin;
   is_car_changed = 1;
-  for (int i = 0; i < 3; i++) { 
+
+  // initializing obstacles' coordinates
+  for (int i = 0; i < SIZE; i++) { 
     row_obs[i] = 1;
     is_obs_changed[i] = 0;
   }
-  // args1.C.is_changed = 1;
-  // args4.C = args1.C;
   args2.win = inputwin;
   args3.win = inputwin;
   args4.win = inputwin;
   args5.win = inputwin;
   args6.win = inputwin;
-  // args2 = args1;
-  pthread_t tid1, tid2, tid3, tid4, tid5, tid6;
-  pthread_attr_t attr;
-  pthread_attr_init(&attr);
+ 
+  pthread_t tid[6];
   refresh();
   wrefresh(inputwin);
+  start = clock();        // record start time
   MakeBlank(inputwin);
-  pthread_create(&tid1, &attr, runner1, &args1);
-  pthread_create(&tid2, &attr, runner2, &args2);
-  pthread_create(&tid3, &attr, runner3, &args3);
-  pthread_create(&tid4, &attr, runner4, &args4);
-  pthread_create(&tid5, &attr, runner5, &args5);
-  // pthread_create(&tid6, &attr, runner6, &args6);
-  pthread_join(tid1, NULL);
-  pthread_join(tid2, NULL);
-  pthread_join(tid3, NULL);
-  pthread_join(tid4, NULL);
-  pthread_join(tid5, NULL);
-  // pthread_join(tid6, NULL);
+  // Creating 6 detached threads
+  pthread_create(&tid[0], NULL, runner1, &args1);
+  pthread_create(&tid[1], NULL, runner2, &args2);
+  pthread_create(&tid[2], NULL, runner3, &args3);
+  pthread_create(&tid[3], NULL, runner4, &args4);
+  pthread_create(&tid[4], NULL, runner5, &args5);
+  pthread_create(&tid[5], NULL, runner6, &args6);
+  for (int i = 0; i < 6; i++) {
+    pthread_detach(tid[i]);
+  }
+
+  // Mechanism to take care of the 'GAME OVER' scenario
+  while(1) {
+    if(game_over) {
+      end = clock();
+      break;
+    }
+  }
+  long long score = (end - start)/CLOCKS_PER_SEC;
+
+  // Makes the screen blank
+  for (int j = 0; j <= 26; j++) {
+    for (int i = 0; i <= 64; i++) 
+      mvwprintw(inputwin, j, i, " ");
+  }
+
+  mvwprintw(inputwin, row_car - 4, col_car - 2, "XXXXXXXXXXXXXXX");
+  mvwprintw(inputwin, row_car - 3, col_car - 2, "XXX         XXX");
+  mvwprintw(inputwin, row_car - 2, col_car - 2, "X XX       XX X");
+  mvwprintw(inputwin, row_car - 1, col_car - 2, "X  XXx*\\/*xXX  X");
+  mvwprintw(inputwin, row_car, col_car - 2, "X    X---X    X");
+  mvwprintw(inputwin, row_car + 1, col_car - 2, "X  XX     XX  X");
+  mvwprintw(inputwin, row_car + 2, col_car - 2, "X XX       XX X");
+  mvwprintw(inputwin, row_car + 3, col_car - 2, "XXX         XXX");
+  mvwprintw(inputwin, row_car + 4, col_car - 2, "XXXXXXXXXXXXXXX");
+  sleep(1);
+
+  // Makes the screen blank
+  for (int j = 0; j <= 26; j++) {
+    for (int i = 0; i <= 64; i++) 
+      mvwprintw(inputwin, j, i, " ");
+  }
+
+  mvwprintw(inputwin, 10, 10, "//////-     /\\\\    |x\\___/x| XXXXXXX");
+  mvwprintw(inputwin, 11, 10, "//         //_\\\\   |X-\\_/-X| XX____ ");
+  mvwprintw(inputwin, 12, 10, "// /|//-  //|||\\\\  |X|   |X| XX^^^^ ");
+  mvwprintw(inputwin, 13, 10, "//////-  //     \\\\ |X|   |X| XXXXXXX");
+  usleep(10000);
+  mvwprintw(inputwin, 15, 10, "XXXXXXX  \\\\     //  XXXXXXX  XXXx~\\     ");
+  mvwprintw(inputwin, 16, 10, "XX   XX   \\\\   //   XX____   XX___))");
+  mvwprintw(inputwin, 17, 10, "XX   XX    \\\\ //    XX^^^^   XXXx ");
+  mvwprintw(inputwin, 18, 10, "XXXXXXX     \\\\//    XXXXXXX  XX  XX");
+
+  mvwprintw(inputwin, 20, 20, "Your Score %d", score);
+  HandleHighscore(score, inputwin);
+  sleep(7);
   
-  getch();
   endwin();
   return 0;
 }
 
+// A utility which updates the highscore if needed
+void HandleHighscore(long long score, WINDOW * inputwin) {
+  int score_len = 0;
+  FILE * fp = fopen("highscore_db.txt", "r+");
+  char buffer[32];
+  char score_str[64];
+  // get the score in the string format
+  get_string(score_str, score, &score_len);
+  // read the highscore from file
+  fgets(buffer, 32, fp);
+  // get the highscore in integer format
+  long long highscore = atoi(buffer);
+  if(score > highscore) { // the case when new highscore happens
+    freopen(NULL,"w+",fp);
+    strcat(score_str, "\n");
+    fwrite(score_str, score_len, 1, fp);
+    mvwprintw(inputwin, 22, 18, "Congratulations! NEW High Score");
+    mvwprintw(inputwin, 24, 18, "Last highscore %d smashed brutally", highscore);
+  }
+  fclose(fp);
+}
+
+// converts src to corresponding ascii string
+void get_string(char * dest, long long src, int *dest_len) {
+  *dest_len = 0;
+  int temp;
+  // length calculation
+  int i = src;
+  while(i != 0) {
+    i /= 10;
+    *dest_len = *dest_len + 1;  
+  }
+  // filling the passed string appropriately
+  memset(dest, 0, SIZE);
+  int j = *dest_len - 1;
+  i = src;
+  while(i != 0) {
+    temp = i % 10;
+    dest[j] = temp + 48;
+    i = i / 10;
+    j--;
+  }
+}
+
+
 /*********** Printing the Car logic ********************/
-// prints the car 
+// the thread which take care of printing the car logic based on changes 
 void* runner1(void *params) {
   struct block * args = params;
-  // move(row_car, args->C.col_c);
   while(1) {
     if(is_car_changed == 1) {
       MakeBlank(args->win);
@@ -110,10 +199,12 @@ void* runner1(void *params) {
   pthread_exit(NULL);
 }
 
+// makes the whole screen blank except the obstacles
 void MakeBlank(WINDOW * win) {
   for (int j = 0; j <= 26; j++) {
     for (int i = 3; i <= 60; i++) {
-      for (int k = 0; k < 3; k++) {
+      for (int k = 0; k < SIZE; k++) {
+        // usleep(10);
         if(!((j >= row_obs[k]) && (j <= row_obs[k]+3) && (i >= col_obs[k]) && (i <= col_obs[k]+6)))
           mvwprintw(win, j, i, " ");
       }
@@ -121,40 +212,65 @@ void MakeBlank(WINDOW * win) {
   }
 }
 
+// Print the car at the given location
 void PrintCar(WINDOW * win) {
-  mvwprintw(win, row_car, col_car, "******");
-  mvwprintw(win, row_car + 1, col_car, "******");
+  if(game_over)         // terminate the thread in case of game_over
+    pthread_exit(NULL);
+  mvwprintw(win, row_car, col_car, " ^**^ ");
+  mvwprintw(win, row_car + 1, col_car, " **** ");
   mvwprintw(win, row_car + 2, col_car, "******");
-  mvwprintw(win, row_car + 3, col_car, "******");
-  mvwprintw(win, row_car + 4, col_car - 5, "****************");
-  mvwprintw(win, row_car + 5, col_car - 5, "****************");
-  mvwprintw(win, row_car + 6, col_car - 5, "****************");
-  mvwprintw(win, row_car + 7, col_car - 5, "*****      *****");
-  mvwprintw(win, row_car + 8, col_car - 5, "*****      *****");
-  mvwprintw(win, row_car + 9, col_car - 5, "*****      *****");
+  mvwprintw(win, row_car + 3, col_car - 5, " ************** ");
+  mvwprintw(win, row_car + 4, col_car - 5, "*****^*****^****");
+  mvwprintw(win, row_car + 5, col_car - 5, "****        ****");
 }
 
 /*********************************************************/
 
-/******************* Fence movement logic ****************/
 
-// runs both the fences
-void* runner2(void *params) {
+/*********************** Moving the Car logic *****************/
+// this thread listens to the keyboard key presses for car movement
+void *runner4 (void *params) {
   struct block * args = params;
   while(1) {
-    blink2(0, args->win, 1, 0);
-    blink2(0, args->win, 1, 61);
-    usleep(T);
-    blink2(1, args->win, 1, 0);
-    blink2(1, args->win, 1, 61);
-    usleep(T);  
+    if(game_over)
+      break;
+    int c = wgetch(args->win);
+    if (c == 'a') {
+      if (col_car > 10) {
+        col_car -= 20;
+        is_car_changed = 1;
+      }
+    } 
+    else if (c == 'd') {
+      if (col_car < 40) {
+        col_car += 20;
+        is_car_changed = 1;
+      }
+    } 
   }
-  printf ("Welcome to my game \n");
   pthread_exit(NULL);
 }
 
-// blinks the fences
-void blink2(int n, WINDOW* win, int cur_r, int cur_c) {
+/**************************************************************/
+
+/******************* Fence movement logic ****************/
+
+// the thread routine which runs both the fences
+void* runner2(void *params) {
+  struct block * args = params;
+  while(1) {
+    blink_fence(0, args->win, 1, 0);
+    blink_fence(0, args->win, 1, 61);
+    usleep(T);
+    blink_fence(1, args->win, 1, 0);
+    blink_fence(1, args->win, 1, 61);
+    usleep(T);  
+  }
+  pthread_exit(NULL);
+}
+
+// a utility to make the fences blink 
+void blink_fence(int n, WINDOW* win, int cur_r, int cur_c) {
   wrefresh(win);
   int main = cur_r;
   int i = 24;
@@ -172,28 +288,23 @@ void blink2(int n, WINDOW* win, int cur_r, int cur_c) {
     mvwprintw(win, cur_r, cur_c, ",,,");
     cur_r += 3;
   }
-  
   return;
 }
 
 /*********************************************************/
 
-/******************** Obstacle logic *********************/
+/******************** Obstacle handling logic *********************/
 
 // moves the obstacle 
 void* runner3(void *params) {
   struct block * args = params;
-
-  while(1) {  
-    // int i = 0;
-    for (int i = 0; i < 3; i++) {
+  while(1) {
+    for (int i = 0; i < SIZE; i++) {
       if(is_obs_changed[i] == 1) {
-        mvwprintw(args->win, row_obs[i] - 1, col_obs[i], "      ");
-        // BlankPrev(args->win);
+        mvwprintw(args->win, row_obs[i] - 1, col_obs[i] - 5, "                ");
         PrintObstacle(args->win, row_obs[i], col_obs[i]);
-        usleep(100000);
+        usleep(99000);
         row_obs[i] = row_obs[i] + 1;
-        // is_obs_changed = 0;
       }
     }
   }
@@ -204,7 +315,6 @@ void* runner3(void *params) {
 void* runner5(void* params) {
   struct block * args = params;
   int i = 0;
-  // wprintw(args->win, "shul");
   while(1) {
     srand(time(0));
     int t = rand() % 2;
@@ -215,7 +325,7 @@ void* runner5(void* params) {
       usleep(1901000);
       continue;
     }
-    i = (i + 1) % 3;
+    i = (i + 1) % SIZE;
     if ((row_obs[i] >= 26) || (row_obs[i] == 1)){
       row_obs[i] = 1;
       if(col_car == 10) {
@@ -248,53 +358,45 @@ void* runner5(void* params) {
             break;
         }
       }
-      // col_obs = 10;
       is_obs_changed[i] = 1;
       usleep(1901000);
-      i = (i + 1) % 3;
-      // col_obs[i] = car_location;
-      // is_obs_changed[i] = 1;
-      // i = (i + 1) % 3;
-      // sleep(0.9);
-      // while(row_obs[i] != 26) {}
+      i = (i + 1) % SIZE;
     }
   }
   pthread_exit(NULL);
 }
 
-
-// print the obstacle
+// print the obstacle at the passed row and column coordinate
 void PrintObstacle(WINDOW * win, int row_c, int col_c) {
+  if(game_over)
+    pthread_exit(NULL);
   mvwprintw(win, row_c, col_c, "XXXXXX");
-  mvwprintw(win, row_c + 1, col_c, "XXXXXX");
-  mvwprintw(win, row_c + 2, col_c, "XXXXXX");
-  mvwprintw(win, row_c + 3, col_c, "XXXXXX");
+  mvwprintw(win, row_c + 1, col_c - 5, "/////XXXXXX\\\\\\\\\\");
+  mvwprintw(win, row_c + 2, col_c - 3, "////XXXX\\\\\\\\");
+  mvwprintw(win, row_c + 3, col_c, "\\~XX~/");
 }
 
 /*********************************************************/
 
-/*********************** Moving the Car logic *****************/
-// listen to keyboard
-void *runner4 (void *params) {
+/*********************** Hit obstacle logic *****************/
+
+void* runner6(void *params) {
   struct block * args = params;
   while(1) {
-    int c = wgetch(args->win);
-    if (c == 'a') {
-      if (col_car > 10) {
-        col_car -= 20;
-        is_car_changed = 1;
+    for (int i = 0; i < SIZE; i++) {
+      if(col_obs[i] == col_car) {
+        if((row_obs[i] >= row_car) && (row_obs[i] < 26)) {
+          game_over = 1;
+          break;
+        }
       }
-    } 
-    else if (c == 'd') {
-      if (col_car < 40) {
-        col_car += 20;
-        is_car_changed = 1;
-      }
-    } 
+    }
   }
   pthread_exit(NULL);
 }
 
-/**************************************************************/
+/*********************************************************/
+
+
 
 
