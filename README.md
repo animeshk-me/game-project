@@ -9,6 +9,3 @@ To execute the `main_experiment.c`
     > `make`
   * Then run
     > `./exp`
-
-    
-Anime wants everything formal
